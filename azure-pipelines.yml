@@ -32,14 +32,24 @@ steps:
     configuration: '$(buildConfiguration)'
 
 # Publicação do pacote como um artefato
-- publish: $(build.artifactStagingDirectory)/WebApp.zip
-  artifact: WebAppArtifact
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(build.artifactStagingDirectory)/WebApp.zip'
+    ArtifactName: 'WebAppArtifact'
 
 # Execução de testes
 - task: VSTest@2
   inputs:
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
+
+# Baixa o artefato publicado antes do deploy
+- task: DownloadBuildArtifacts@0
+  inputs:
+    buildType: 'current'
+    downloadType: 'single'
+    artifactName: 'WebAppArtifact'
+    downloadPath: '$(System.DefaultWorkingDirectory)'
 
 # Deploy para o Azure Web App
 - task: AzureWebApp@1
