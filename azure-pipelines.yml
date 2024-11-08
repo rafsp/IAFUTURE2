@@ -1,64 +1,58 @@
-# ASP.NET Core (.NET Framework)
 trigger:
 - master
 
 pool:
   vmImage: 'windows-latest'
 
+# Inclui o grupo de variáveis e define variáveis adicionais de build
 variables:
-  solution: '**/*.sln'
-  buildPlatform: 'Any CPU'
-  buildConfiguration: 'Release'
+  - name: buildPlatform
+    value: 'Any CPU'
+  - name: buildConfiguration
+    value: 'Release'
+  - group: AzureCredentialsGroup  # Adiciona o grupo de variáveis seguras
 
 steps:
-# Instalação do NuGet
-- task: NuGetToolInstaller@1
+# Etapa 1: Instala o SDK do .NET 5.x
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '5.x'
+    installationPath: $(Agent.ToolsDirectory)/dotnet
 
-# Restauração de pacotes
+# Etapa 2: Restaura os pacotes NuGet para o projeto
 - task: NuGetCommand@2
   inputs:
-    restoreSolution: '$(solution)'
+    restoreSolution: '**/*.sln'  # Encontra e restaura pacotes para todos os arquivos .sln no projeto
 
-# Build do projeto e criação do pacote de deploy
+# Etapa 3: Compila o projeto usando o Visual Studio Build
 - task: VSBuild@1
   inputs:
-    solution: '$(solution)'
-    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:DesktopBuildPackageLocation="$(build.artifactStagingDirectory)/WebApp.zip" /p:DeployIisAppPath="Default Web Site"'
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+    solution: '**/*.sln'  # Compila todos os arquivos de solução (.sln) no repositório
+    platform: '$(buildPlatform)'  # Usa a plataforma definida na variável `buildPlatform`
+    configuration: '$(buildConfiguration)'  # Usa a configuração de build definida na variável `buildConfiguration`
 
-# Verificação para garantir que o arquivo foi criado
-- script: |
-    echo "Verificando se o arquivo foi gerado na pasta de artefatos:"
-    dir "$(build.artifactStagingDirectory)"
-  displayName: 'Verificar criação do WebApp.zip'
-
-# Publicação do pacote como um artefato
-- task: PublishPipelineArtifact@1
+# Etapa 4: Publica o projeto para gerar os artefatos de deploy
+- task: DotNetCoreCLI@2
   inputs:
-    targetPath: '$(build.artifactStagingDirectory)/WebApp.zip'
-    artifactName: 'WebAppArtifact'
-  displayName: 'Publicar WebApp.zip como artefato'
+    command: 'publish'  # Comando de publicação do .NET CLI
+    publishWebProjects: true  # Publica todos os projetos web no repositório
+    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'  # Define a saída para o diretório de artefatos
 
-# Baixa o artefato publicado antes do deploy
-- task: DownloadPipelineArtifact@2
+# Etapa 5: Faz login no Azure usando as variáveis seguras
+- task: AzureCLI@2
   inputs:
-    artifactName: 'WebAppArtifact'
-    path: '$(System.DefaultWorkingDirectory)'
-  displayName: 'Baixar o artefato WebAppArtifact'
+    azureSubscription: 'Azure for Students (10b15b88-8a07-4ad9-bf08-e557ed8f5519)'  # Nome da Service Connection no Azure DevOps
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      echo "Realizando login no Azure..."
+      # Autenticação no Azure usando as variáveis seguras
+      az login --service-principal -u $(azureClientId) -p $(azureClientSecret) --tenant $(azureTenantId)
 
-# Verificação para confirmar o download do artefato
-- script: |
-    echo "Verificando se o arquivo WebApp.zip foi baixado:"
-    dir "$(System.DefaultWorkingDirectory)\WebAppArtifact"
-  displayName: 'Confirmar o download do WebApp.zip'
-
-# Deploy para o Azure Web App
+# Etapa 6: Realiza o deploy do projeto no Azure Web App
 - task: AzureWebApp@1
   inputs:
-    azureSubscription: 'Azure for Students (10b15b88-8a07-4ad9-bf08-e557ed8f5519)'
-    appType: 'webApp'
-    appName: 'globalsolution-fiap'
-    package: '$(System.DefaultWorkingDirectory)/WebAppArtifact/WebApp.zip'
-    deploymentMethod: 'auto'
-  displayName: 'Deploy para Azure Web App'
+    azureSubscription: 'Azure for Students (10b15b88-8a07-4ad9-bf08-e557ed8f5519)'  # Nome da sua Service Connection configurada no Azure DevOps
+    appName: 'globalsolution-fiap'  # Nome do Azure Web App onde o projeto será implantado
+    package: '$(Build.ArtifactStagingDirectory)'  # Caminho dos artefatos de publicação gerados na etapa de publicação
