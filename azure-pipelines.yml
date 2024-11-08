@@ -1,8 +1,4 @@
 # ASP.NET Core (.NET Framework)
-# Build and test ASP.NET Core projects targeting the full .NET Framework.
-# Add steps that publish symbols, save build artifacts, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
-
 trigger:
 - master
 
@@ -31,25 +27,31 @@ steps:
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
 
-# Publicação do pacote como um artefato
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: '$(build.artifactStagingDirectory)/WebApp.zip'
-    ArtifactName: 'WebAppArtifact'
+# Verificação para garantir que o arquivo foi criado
+- script: |
+    echo "Verificando se o arquivo foi gerado na pasta de artefatos:"
+    dir "$(build.artifactStagingDirectory)"
+  displayName: 'Verificar criação do WebApp.zip'
 
-# Execução de testes
-- task: VSTest@2
+# Publicação do pacote como um artefato
+- task: PublishPipelineArtifact@1
   inputs:
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+    targetPath: '$(build.artifactStagingDirectory)/WebApp.zip'
+    artifactName: 'WebAppArtifact'
+  displayName: 'Publicar WebApp.zip como artefato'
 
 # Baixa o artefato publicado antes do deploy
-- task: DownloadBuildArtifacts@0
+- task: DownloadPipelineArtifact@2
   inputs:
-    buildType: 'current'
-    downloadType: 'single'
     artifactName: 'WebAppArtifact'
-    downloadPath: '$(System.DefaultWorkingDirectory)'
+    path: '$(System.DefaultWorkingDirectory)'
+  displayName: 'Baixar o artefato WebAppArtifact'
+
+# Verificação para confirmar o download do artefato
+- script: |
+    echo "Verificando se o arquivo WebApp.zip foi baixado:"
+    dir "$(System.DefaultWorkingDirectory)\WebAppArtifact"
+  displayName: 'Confirmar o download do WebApp.zip'
 
 # Deploy para o Azure Web App
 - task: AzureWebApp@1
@@ -59,3 +61,4 @@ steps:
     appName: 'globalsolution-fiap'
     package: '$(System.DefaultWorkingDirectory)/WebAppArtifact/WebApp.zip'
     deploymentMethod: 'auto'
+  displayName: 'Deploy para Azure Web App'
