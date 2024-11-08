@@ -13,11 +13,11 @@ variables:
   - group: AzureCredentialsGroup  # Adiciona o grupo de variáveis seguras
 
 steps:
-# Etapa 1: Instala o SDK do .NET 5.x
+# Etapa 1: Instala o SDK do .NET 8.x (compatível com o .NET 8.0)
 - task: UseDotNet@2
   inputs:
     packageType: 'sdk'
-    version: '5.x'
+    version: '8.x'  # Atualizado para o .NET 8.x
     installationPath: $(Agent.ToolsDirectory)/dotnet
 
 # Etapa 2: Restaura os pacotes NuGet para o projeto
